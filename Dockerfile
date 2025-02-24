@@ -1,10 +1,10 @@
-# Use Node.js 18 (or your Jenkins-configured version)
-FROM node:18
+# Use a Node.js builder image for installing dependencies and building the app
+FROM node:23 AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Copy package.json and package-lock.json first for better caching
 COPY package.json package-lock.json ./
 
 # Force install a compatible PostCSS version to fix the issue
@@ -16,6 +16,18 @@ RUN npm install
 # Copy the entire project
 COPY . .
 
+# Build the application (modify if you have a build step, e.g., React or TypeScript projects)
+RUN npm run build
+
+# Use a lightweight distroless Node.js base image for running the app
+FROM gcr.io/distroless/nodejs:18
+
+# Set working directory in the new container
+WORKDIR /app
+
+# Copy only necessary files from the builder stage
+COPY --from=builder /app /app
+
 # Expose port 3000
 EXPOSE 3000
 
@@ -25,3 +37,4 @@ ENV PORT=3000
 
 # Start the application
 CMD ["npm", "start"]
+
