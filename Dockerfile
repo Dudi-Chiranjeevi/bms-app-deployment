@@ -1,34 +1,29 @@
-# Use a Node.js builder image for installing dependencies and building the app
-FROM node:18 AS builder
+# Use a lightweight Node.js Alpine image for building
+FROM node:18-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first for better caching
+# Copy package.json and package-lock.json first to leverage caching
 COPY package.json package-lock.json ./
 
-# Set environment variable to prevent OpenSSL errors during build
-ENV NODE_OPTIONS="--openssl-legacy-provider"
-
-# Force install a compatible PostCSS version to fix the issue
-RUN npm install postcss@8.4.21 postcss-safe-parser@6.0.0 --legacy-peer-deps
-
-# Install dependencies using npm ci if package-lock.json is available
-RUN npm ci
+# Install dependencies using npm ci for a clean install
+RUN npm ci --legacy-peer-deps \
+    && npm install postcss@8.4.21 postcss-safe-parser@6.0.0 --legacy-peer-deps
 
 # Copy the entire project
-COPY . . 
+COPY . .
 
 # Build the application
 RUN npm run build
 
-# Use a lightweight Node.js base image for running the app
+# Use a minimal runtime image
 FROM node:18-alpine
 
-# Set working directory in the new container
+# Set working directory
 WORKDIR /app
 
-# Copy only the necessary files from the builder stage
+# Copy only necessary files from builder stage
 COPY --from=builder /app/build /app/build
 COPY --from=builder /app/package.json /app/
 COPY --from=builder /app/node_modules /app/node_modules
