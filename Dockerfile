@@ -1,4 +1,4 @@
-# Use a lightweight Node.js Alpine image for building
+# Stage 1: Build the React app
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -8,10 +8,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies using npm ci for a clean install
-RUN npm ci --legacy-peer-deps \
-    && npm install postcss@8.4.21 postcss-safe-parser@6.0.0 --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
-# Copy the entire project
+# Copy the rest of the application
 COPY . .
 
 # Fix OpenSSL error for Webpack
@@ -20,14 +19,20 @@ ENV NODE_OPTIONS="--openssl-legacy-provider"
 # Build the application
 RUN npm run build
 
-# Use Nginx as a web server
-FROM nginx:alpine
+# Stage 2: Serve the React app using a lightweight server (Serve)
+FROM node:18-alpine AS runner
 
-# Copy the build output to the Nginx web root
-COPY --from=builder /app/build /usr/share/nginx/html
+# Set working directory
+WORKDIR /app
 
-# Expose port 80
-EXPOSE 80
+# Install 'serve' package globally
+RUN npm install -g serve
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Copy build output from the builder stage
+COPY --from=builder /app/build ./build
+
+# Expose port 3000
+EXPOSE 3000
+
+# Start the application using 'serve'
+CMD ["serve", "-s", "build", "-l", "3000"]
