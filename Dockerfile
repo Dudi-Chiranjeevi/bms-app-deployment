@@ -1,38 +1,38 @@
-# Stage 1: Build the React app
+# Use a smaller base image for efficiency
 FROM node:18-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first for better caching
+# Copy only package.json and package-lock.json first to optimize caching
 COPY package.json package-lock.json ./
 
-# Install dependencies using npm ci for a clean install
-RUN npm ci --legacy-peer-deps
+# Install dependencies without unnecessary cache
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 
-# Copy the rest of the application
+# Copy the rest of the application (excluding node_modules due to .dockerignore)
 COPY . .
 
-# Fix OpenSSL error for Webpack
-ENV NODE_OPTIONS="--openssl-legacy-provider"
-
-# Build the application
+# Build the project
 RUN npm run build
 
-# Stage 2: Serve the React app using a lightweight server (Serve)
-FROM node:18-alpine AS runner
+# Use a lightweight final image
+FROM node:18-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Install 'serve' package globally
+# Copy only necessary built files from builder stage
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production --no-audit --no-fund
+
+# Install a minimal HTTP server
 RUN npm install -g serve
 
-# Copy build output from the builder stage
-COPY --from=builder /app/build ./build
-
-# Expose port 3000
+# Expose the necessary port
 EXPOSE 3000
 
-# Start the application using 'serve'
+# Start the application
 CMD ["serve", "-s", "build", "-l", "3000"]
