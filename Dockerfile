@@ -7,34 +7,38 @@ WORKDIR /app
 # Copy package.json and package-lock.json first for better caching
 COPY package.json package-lock.json ./
 
+# Set environment variable to prevent OpenSSL errors during build
+ENV NODE_OPTIONS="--openssl-legacy-provider"
+
 # Force install a compatible PostCSS version to fix the issue
 RUN npm install postcss@8.4.21 postcss-safe-parser@6.0.0 --legacy-peer-deps
 
-# Install dependencies
-RUN npm install
+# Install dependencies using npm ci if package-lock.json is available
+RUN npm ci
 
 # Copy the entire project
-COPY . .
+COPY . . 
 
-# Build the application (modify if you have a build step, e.g., React or TypeScript projects)
+# Build the application
 RUN npm run build
 
-# Use a lightweight distroless Node.js base image for running the app
-FROM gcr.io/distroless/nodejs:18
+# Use a lightweight Node.js base image for running the app
+FROM node:18-alpine
 
 # Set working directory in the new container
 WORKDIR /app
 
-# Copy only necessary files from the builder stage
-COPY --from=builder /app /app
+# Copy only the necessary files from the builder stage
+COPY --from=builder /app/build /app/build
+COPY --from=builder /app/package.json /app/
+COPY --from=builder /app/node_modules /app/node_modules
 
 # Expose port 3000
 EXPOSE 3000
 
-# Set environment variable to prevent OpenSSL errors
-ENV NODE_OPTIONS=--openssl-legacy-provider
+# Set environment variables
+ENV NODE_ENV=production
 ENV PORT=3000
 
 # Start the application
 CMD ["npm", "start"]
-
