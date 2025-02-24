@@ -4,7 +4,7 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json first to leverage caching
+# Copy package.json and package-lock.json first for better caching
 COPY package.json package-lock.json ./
 
 # Install dependencies using npm ci for a clean install
@@ -13,6 +13,9 @@ RUN npm ci --legacy-peer-deps \
 
 # Copy the entire project
 COPY . .
+
+# Fix OpenSSL error for Webpack
+ENV NODE_OPTIONS="--openssl-legacy-provider"
 
 # Build the application
 RUN npm run build
