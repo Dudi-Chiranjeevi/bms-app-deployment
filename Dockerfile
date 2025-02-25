@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
+# Set OpenSSL legacy provider before running npm install and build
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 RUN npm install --only=production && npm cache clean --force
 
 COPY . .
@@ -25,7 +28,6 @@ RUN npm install -g serve
 EXPOSE 3000
 
 # Set environment variables
-ENV NODE_OPTIONS=--openssl-legacy-provider
 ENV PORT=3000
 
 # Start the application
