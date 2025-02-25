@@ -1,38 +1,32 @@
-# Use a smaller base image for efficiency
-FROM node:18-alpine AS builder
+FROM node:18 AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy only package.json and package-lock.json first to optimize caching
 COPY package.json package-lock.json ./
 
-# Install dependencies without unnecessary cache
-RUN npm ci --legacy-peer-deps --no-audit --no-fund
+RUN npm install --only=production && npm cache clean --force
 
-# Copy the rest of the application (excluding node_modules due to .dockerignore)
 COPY . .
 
-# Build the project
 RUN npm run build
 
-# Use a lightweight final image
-FROM node:18-alpine
+FROM node:18-slim AS runner
 
 WORKDIR /app
 
-# Copy only necessary built files from builder stage
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/package.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production --no-audit --no-fund
-
-# Install a minimal HTTP server
+# Install `serve` for serving static files
 RUN npm install -g serve
 
-# Expose the necessary port
+# Expose port 3000
 EXPOSE 3000
+
+# Set environment variables
+ENV NODE_OPTIONS=--openssl-legacy-provider
+ENV PORT=3000
 
 # Start the application
 CMD ["serve", "-s", "build", "-l", "3000"]
